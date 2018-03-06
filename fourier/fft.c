@@ -51,7 +51,8 @@ void freq2spectra(int rows, int cols, fftw_complex* freq_repr, float* as, float*
     int size = cols * rows;
     for (int i = 0; i < size; i++) {
         as[i] = sqrt(pow(creal(freq_repr[i]), 2) + pow(cimag(freq_repr[i]), 2));
-        ps[i] = atan(cimag(freq_repr[i]) / creal(freq_repr[i]));
+        // ps[i] = atan(cimag(freq_repr[i]) / creal(freq_repr[i]));
+        ps[i] = atan2(cimag(freq_repr[i]), creal(freq_repr[i]));
     }
 }
 
