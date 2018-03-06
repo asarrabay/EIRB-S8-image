@@ -6,8 +6,18 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
+#include <libgen.h>
+#include <string.h>
 
 #include <fft.h>
+
+#define SAVE(path_src, prefix, img){\
+    char *filename_src = basename(path_src);\
+    char filename_dst[strlen(filename_src) + sizeof(prefix) + 1];\
+    filename_dst[0] = '\0';\
+    strcat(filename_dst, prefix);\
+    strcat(filename_dst, filename_src);\
+    pnm_save(img, PnmRawPpm, filename_dst);}\
 
 /**
 * @brief test the forward and backward functions
@@ -27,7 +37,7 @@ test_forward_backward(char* name)
     for (int i = 0; i < size; i++) {
         data[i] = img_back[i];
     }
-    pnm_save(img, PnmRawPpm, "FB-res.ppm");
+    SAVE(name, "FB-", img);
     fprintf(stderr, "OK\n");
 }
 
@@ -57,7 +67,7 @@ test_reconstruction(char* name)
     for (int i = 0; i < size; i++) {
         data[i] = img_back[i];
     }
-    pnm_save(img, PnmRawPpm, "FB-ASPS-res.ppm");
+    SAVE(name, "FB-ASPS-", img);
     fprintf(stderr, "OK\n");
 }
 
@@ -107,8 +117,8 @@ test_display(char* name)
     }
 
 
-    pnm_save(img_as, PnmRawPpm, "AS-res.ppm");
-    pnm_save(img_ps, PnmRawPpm, "PS-res.ppm");
+    SAVE(name, "AS-", img_as);
+    SAVE(name, "PS-", img_ps);
     fprintf(stderr, "OK\n");
 }
 
