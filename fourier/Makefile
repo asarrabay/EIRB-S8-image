@@ -1,7 +1,7 @@
 ROOT=../bcl
 
-CPPFLAGS = -I. -I$(ROOT)/include 
-CFLAGS   = -Wall -Wextra -Werror -pedantic -std=c99 
+CPPFLAGS = -I. -I$(ROOT)/include
+CFLAGS   = -Wall -Wextra  -pedantic -std=c99
 LDFLAGS  = -L$(ROOT)/lib
 LDLIBS   = -lbcl -lfftw3 -lm
 
@@ -12,11 +12,12 @@ all: $(BIN)
 
 test-fft: test-fft.o fft.o
 
-.PHONY: clean cleanall 
+test: all
+	./test-fft ../data/lena-gray.ppm && pvisu FB-lena-gray.ppm && pvisu FB-ASPS-lena-gray.ppm && pvisu AS-lena-gray.ppm && pvisu && pvisu AS-lena-gray.ppm FREQ-lena-gray.ppm && pvisu FAS-lena-gray.ppm
+
+.PHONY: clean cleanall
 clean:
 	$(RM) *.o *~ *.ppm
 
 cleanall: clean
-	$(RM) $(BIN) 
-
-
+	$(RM) $(BIN)

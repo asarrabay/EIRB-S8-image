@@ -14,7 +14,7 @@ fftw_complex * forward(int rows, int cols, unsigned short* g_img) {
     int size = rows * cols;
     fftw_complex *img_c = malloc(sizeof(fftw_complex) * size);
     for (int i = 0; i < size; i++) {
-        img_c[i] = g_img[i]; // induit : + 0*I
+        img_c[i] = g_img[3*i]; // induit : + 0*I
         SHIFT(img_c[i], i, rows, cols)
     }
     fftw_complex *res_c = malloc(sizeof(fftw_complex) * size);
@@ -38,7 +38,6 @@ unsigned short * backward(int rows, int cols, fftw_complex* freq_repr) {
         if (tmp < 0.0) {
             tmp = 0;
         } else if(tmp > 255){
-            // TODO utile?
             tmp = 255;
         }
         img[i] = tmp;

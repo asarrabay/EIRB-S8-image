@@ -35,7 +35,9 @@ test_forward_backward(char* name)
     fftw_complex *freq_repr = forward(rows, cols, data);
     unsigned short *img_back = backward(rows, cols, freq_repr);
     for (int i = 0; i < size; i++) {
-        data[i] = img_back[i];
+      data[3*i] = img_back[i];
+      data[3*i+1] = img_back[i];
+      data[3*i+2] = img_back[i];
     }
     SAVE(name, "FB-", img);
     fprintf(stderr, "OK\n");
@@ -65,7 +67,9 @@ test_reconstruction(char* name)
 
     unsigned short *img_back = backward(rows, cols, freq_repr);
     for (int i = 0; i < size; i++) {
-        data[i] = img_back[i];
+      data[3*i] = img_back[i];
+      data[3*i+1] = img_back[i];
+      data[3*i+2] = img_back[i];
     }
     SAVE(name, "FB-ASPS-", img);
     fprintf(stderr, "OK\n");
@@ -132,8 +136,48 @@ void
 
 test_add_frequencies(char* name)
 {
+
     fprintf(stderr, "test_add_frequencies: ");
-    (void)name;
+    pnm img = pnm_load(name);
+    int rows = pnm_get_height(img);
+    int cols = pnm_get_width(img);
+    int size = rows * cols;
+    unsigned short *data = pnm_get_image(img);
+    fftw_complex *freq_repr = forward(rows, cols, data);
+
+    float *as = malloc(sizeof(float) * size);
+    float *ps = malloc(sizeof(float) * size);
+    freq2spectra(rows, cols, freq_repr, as, ps);
+    int frequency = 724;
+    int add_value = 10000000;
+    as[frequency] += add_value;
+    //beginning display
+    pnm img_as = pnm_new(cols, rows, PnmRawPpm);
+    unsigned short *data_as = pnm_get_image(img_as);
+    float as_max = .0;
+    for (int i = 0; i < size; i++) {
+        if (as_max < as[i]) {
+            as_max = as[i];
+        }
+    }
+    for (int i = 0; i < size; i++) {
+
+        for (int k = 0; k < 3; k++) {
+            data_as[i*3+k] = 255 * pow(as[i]/as_max, .1);
+            // data_as[i*3+k] = log10(1+as[i]);
+        }
+    }
+    SAVE(name, "FAS-", img_as);
+    //end display
+
+    spectra2freq(rows, cols,as, ps, freq_repr);
+    unsigned short *img_back = backward(rows, cols, freq_repr);
+    for (int i = 0; i < size; i++) {
+        data[3*i] = img_back[i];
+        data[3*i+1] = img_back[i];
+        data[3*i+2] = img_back[i];
+    }
+    SAVE(name, "FREQ-", img);
     fprintf(stderr, "OK\n");
 }
 
