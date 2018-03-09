@@ -40,6 +40,9 @@ test_forward_backward(char* name)
       data[3*i+2] = img_back[i];
     }
     SAVE(name, "FB-", img);
+    free(img_back);
+    free(freq_repr);
+    pnm_free(img);
     fprintf(stderr, "OK\n");
 }
 
@@ -72,6 +75,11 @@ test_reconstruction(char* name)
       data[3*i+2] = img_back[i];
     }
     SAVE(name, "FB-ASPS-", img);
+    free(img_back);
+    free(as);
+    free(ps);
+    free(freq_repr);
+    pnm_free(img);
     fprintf(stderr, "OK\n");
 }
 
@@ -123,6 +131,13 @@ test_display(char* name)
 
     SAVE(name, "AS-", img_as);
     SAVE(name, "PS-", img_ps);
+    pnm_free(img);
+    free(as);
+    free(ps);
+    free(freq_repr);
+    pnm_free(img_as);
+    pnm_free(img_ps);
+
     fprintf(stderr, "OK\n");
 }
 
@@ -181,6 +196,12 @@ test_add_frequencies(char* name)
         data[3*i+2] = img_back[i];
     }
     SAVE(name, "FREQ-", img);
+    free(img_back);
+    free(as);
+    free(ps);
+    free(freq_repr);
+    pnm_free(img);
+    pnm_free(img_as);
     fprintf(stderr, "OK\n");
 }
 
