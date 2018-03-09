@@ -148,9 +148,6 @@ test_add_frequencies(char* name)
     float *as = malloc(sizeof(float) * size);
     float *ps = malloc(sizeof(float) * size);
     freq2spectra(rows, cols, freq_repr, as, ps);
-    int frequency = 724;
-    int add_value = 10000000;
-    as[frequency] += add_value;
     //beginning display
     pnm img_as = pnm_new(cols, rows, PnmRawPpm);
     unsigned short *data_as = pnm_get_image(img_as);
@@ -160,8 +157,14 @@ test_add_frequencies(char* name)
             as_max = as[i];
         }
     }
-    for (int i = 0; i < size; i++) {
+    //add the frequency
+    int freq = 8;
+    as[size/2+freq+cols/2] = 0.25*as_max;
+    as[size/2-freq*cols+cols/2] = 0.25*as_max;
+    as[size/2-freq+cols/2] = 0.25*as_max;
+    as[size/2+freq*cols+cols/2] = 0.25*as_max;
 
+    for (int i = 0; i < size; i++) {
         for (int k = 0; k < 3; k++) {
             data_as[i*3+k] = 255 * pow(as[i]/as_max, .1);
             // data_as[i*3+k] = log10(1+as[i]);

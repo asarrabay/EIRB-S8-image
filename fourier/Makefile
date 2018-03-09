@@ -13,7 +13,7 @@ all: $(BIN)
 test-fft: test-fft.o fft.o
 
 test: all
-	./test-fft ../data/lena-gray.ppm && pvisu FB-lena-gray.ppm && pvisu FB-ASPS-lena-gray.ppm && pvisu AS-lena-gray.ppm && pvisu && pvisu AS-lena-gray.ppm FREQ-lena-gray.ppm && pvisu FAS-lena-gray.ppm
+	./test-fft ../data/lena-gray.ppm && pvisu FB-lena-gray.ppm && pvisu FAS-lena-gray.ppm && pvisu FREQ-lena-gray.ppm
 
 .PHONY: clean cleanall
 clean:
