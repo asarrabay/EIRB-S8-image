@@ -10,7 +10,7 @@ BIN=pipeline
 .PHONY: all
 all: $(BIN)
 
-padding: fft.o
+pipeline: domain.o fft.o
 
 .PHONY: clean cleanall
 clean:
