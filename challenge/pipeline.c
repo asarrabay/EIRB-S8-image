@@ -7,18 +7,109 @@
 #include <fft.h>
 
 #define PI 3.14159265359
-#define SIZE_NEIGHBOURHOOD 3
+#define GAP_RATIO 1.5
+#define SIZE_NEIGHBOURHOOD 11
 
 struct coord {
-    int x;
-    int y;
+    int i;
+    int j;
 };
 
-struct coord find_circle(pnm img){
+struct coord find_circle(pnm img, int gap_min){
     (void) img;
     struct coord c;
-    c.x = 0;
-    c.y = 0;
+    int rows = pnm_get_height(img);
+    int cols = pnm_get_width(img);
+    for(int i = 0; i < rows; i++){
+        // unsigned short prev = pnm_get_component(img, i, 0, 0);
+        int step = 0;
+        int cpt = 0;
+        int gap_size = 0;
+        int start = 0;
+        int end = 0;
+        for (int j = 1; j < cols-1; j++) {
+            unsigned short current = pnm_get_component(img, i, j, 0);
+            unsigned short next = pnm_get_component(img, i, j+1, 0);
+            switch (step) {
+                case 0:
+                if (current == 0 && next == 0) {
+                    start = j;
+                    step++;
+                }
+                break;
+
+                case 1:
+                if(current == 0){
+                    cpt++;
+                } else if (current == 255 && next == 255) {
+                    if (cpt < gap_min) {
+                        // printf("%d < gap_min\n", cpt);
+                        step = 0;
+                    } else {
+                        // printf("STEP 1: %d, %d\n",i, j );
+                        step++;
+                        gap_size = cpt;
+                    }
+                    cpt = 0;
+                }
+
+                break;
+
+                case 2:
+                if (cpt > gap_size * GAP_RATIO) {
+                    // printf("%d > gap_size*1.5 (%d)\n", cpt, gap_size);
+                    cpt = 0;
+                    step = 0;
+                } else {
+                    if(current == 255){
+                        cpt++;
+                    } else if (current == 0 && next == 0) {
+                        if (cpt < gap_size) {
+                            printf("STEP 2 : %d < gap_min\n", cpt);
+                            step = 0;
+                        } else {
+                            printf("STEP 2 : %d, %d\n",i, j );
+                            printf("STEP 2 cpt: %d\n",cpt);
+                            printf("STEP 2 gap_size: %d\n",gap_size);
+                            step++;
+                        }
+                        cpt = 0;
+                    }
+                }
+
+                break;
+                case 3:
+                if (cpt > gap_size * GAP_RATIO) {
+                    printf("STEP 3 : %d > gap_size$ (%d)\n", cpt, gap_size);
+                    cpt = 0;
+                    step = 0;
+                } else {
+                    if(current == 0){
+                        cpt++;
+                    } else if (current == 255 && next == 255) {
+                        if (cpt < gap_size) {
+                            step = 0;
+                        } else {
+                            end = j;
+                            printf("%d, %d\n",i, j );
+                            printf("######################################\n");
+                            printf("start : %d,%d, end : %d,%d\n", i,start, i,end);
+                            c.i = i;
+                            c.j = start + (end-start)/2;
+                            return c;
+                            printf("###str###################################\n");
+                            step = 0;
+                            exit(0);
+                        }
+                        cpt = 0;
+                    }
+                }
+
+                break;
+            }
+            // prev = current;
+        }
+    }
     return c;
 }
 
@@ -106,8 +197,9 @@ void process(char *ims_name, char *imd_name){
     // imd = filter(ims);
     // pnm_free(ims);
     // ims = imd;
-    imd = thresholding(200, ims);
-    struct coord circle = find_circle(imd);
+    imd = thresholding(180, ims);
+    struct coord circle = find_circle(imd, 2);
+    printf("circle : %d, %d\n", circle.i, circle.j);
     (void) circle;
     pnm_save(imd, PnmRawPpm, imd_name);
     pnm_free(ims);
