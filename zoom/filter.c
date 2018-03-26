@@ -58,12 +58,16 @@ pnm interpolation(filter_f filter, int wf, int a, int rows, int cols, pnm ims){
             }
             for (int chnl = 0; chnl < 3; chnl++) {
                 float s = 0;
-                if (cols_p - j_p >= a + wf - 1) {
+                if (cols_p - j_p >= a + wf+1) {
                     for (int k = left; k <= right; k++) {
                         s += pnm_get_component(ims, i, k, chnl) * filter(k-j);
                     }
                 } else{
-                    s = pnm_get_component(ims, i, cols-1, chnl);
+                    for (int k = 0; k<wf/2; k++)
+                    {
+                      s += pnm_get_component(ims, i, cols-1-k, chnl);
+                    }
+                    s /= wf/2;
                 }
                 if (s > 255) {
                     s = 255;
@@ -126,7 +130,6 @@ void process(int a, char *filter_name, char *ims_name, char *imd_name){
     imd = flip(imd);
     imd = interpolation(filter, wf, a, pnm_get_height(imd), rows, imd);
     imd = flip(imd);
-
     pnm_save(imd, PnmRawPpm, imd_name);
     pnm_free(ims);
     pnm_free(imd);
