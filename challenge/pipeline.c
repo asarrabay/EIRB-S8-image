@@ -8,7 +8,8 @@
 
 #define PI 3.14159265359
 #define GAP_RATIO 1.5
-#define SIZE_NEIGHBOURHOOD 11
+#define SIZE_NEIGHBOURHOOD 7
+#define TOLERANCE 100
 
 struct coord {
     int i;
@@ -149,7 +150,16 @@ float get_mean_neighbourhood(pnm img, int i, int j){
         }
     }
 
+    if(nb_neighbours == 0)
+        return 0;
+
     return sum / nb_neighbours;
+}
+
+int is_too_far(unsigned short px, unsigned short mean){
+    unsigned short tmp = fabs(px - mean);
+
+    return tmp > TOLERANCE;
 }
 
 pnm filter(pnm ims){
@@ -161,8 +171,16 @@ pnm filter(pnm ims){
     for(int i = 0; i < cols; i++){
         for(int j = 0; j < rows; j++){
             float mean = get_mean_neighbourhood(ims, i, j);
+            unsigned short px = pnm_get_component(ims, j, i, PnmRed);
+            unsigned short value;
+            if(is_too_far(px, mean)){
+                value = 255;
+            }
+            else{
+                value = mean;
+            }
             for(int c = 0; c < 3; c++){
-                pnm_set_component(res, j, i, c, mean);
+                pnm_set_component(res, j, i, c, value);
             }
         }
     }
@@ -194,7 +212,7 @@ void process(char *ims_name, char *imd_name){
     // int rows = pnm_get_height(ims);
     // pnm imd = pnm_new(imd_name, cols, rows, PnmRawPpm);
     pnm imd;
-    // imd = filter(ims);
+    imd = filter(ims);
     // pnm_free(ims);
     // ims = imd;
     imd = thresholding(180, ims);
