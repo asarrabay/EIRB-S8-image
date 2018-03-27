@@ -390,12 +390,14 @@ float compute_angle(struct coord centers[4]){
     }
 
     float a = fabs(centers[0].i - centers[index_target].i);
-    float b = fabs(centers[0].j - centers[index_target].j);
+    float b = centers[0].j - centers[index_target].j;
 
     if(b == 0)
         return 0;
 
-    return rad2deg(atanf(a/b));
+    float angle = rad2deg(atanf(a/b));
+
+    return angle;
 }
 void process(char *ims_name, char *imd_name){
     pnm ims = pnm_load(ims_name);
@@ -412,6 +414,7 @@ void process(char *ims_name, char *imd_name){
     struct coord centers[4];
     search_circles(imd, centers);
     float angle = compute_angle(centers);//degrees
+    printf("angle %f\n", angle);
     rotate(cols/2, rows/2, angle, ims, imd);
     pnm_save(imd, PnmRawPpm, imd_name);
     pnm_free(ims);
