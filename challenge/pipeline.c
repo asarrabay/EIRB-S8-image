@@ -7,6 +7,7 @@
 #include <fft.h>
 
 #define PI 3.14159265359
+#define GAP_RATIO 1.5
 #define SIZE_NEIGHBOURHOOD 7
 #define TOLERANCE_DIFF_PIXELS_FILTER 60
 #define TOLERANCE_RATIO_CIRCLE_NOISE 0.90
@@ -14,17 +15,106 @@
 #define MAX_POSSIBLES 512
 
 struct coord {
-    int x;
-    int y;
+    int i;
+    int j;
 };
-
 void search_circles(pnm img, struct coord final_points[4]);
 
-struct coord find_circle(pnm img){
+struct coord find_circle(pnm img, int gap_min){
     (void) img;
     struct coord c;
-    c.x = 0;
-    c.y = 0;
+    int rows = pnm_get_height(img);
+    int cols = pnm_get_width(img);
+    for(int i = 0; i < rows; i++){
+        // unsigned short prev = pnm_get_component(img, i, 0, 0);
+        int step = 0;
+        int cpt = 0;
+        int gap_size = 0;
+        int start = 0;
+        int end = 0;
+        for (int j = 1; j < cols-1; j++) {
+            unsigned short current = pnm_get_component(img, i, j, 0);
+            unsigned short next = pnm_get_component(img, i, j+1, 0);
+            switch (step) {
+                case 0:
+                if (current == 0 && next == 0) {
+                    start = j;
+                    step++;
+                }
+                break;
+
+                case 1:
+                if(current == 0){
+                    cpt++;
+                } else if (current == 255 && next == 255) {
+                    if (cpt < gap_min) {
+                        // printf("%d < gap_min\n", cpt);
+                        step = 0;
+                    } else {
+                        // printf("STEP 1: %d, %d\n",i, j );
+                        step++;
+                        gap_size = cpt;
+                    }
+                    cpt = 0;
+                }
+
+                break;
+
+                case 2:
+                if (cpt > gap_size * GAP_RATIO) {
+                    // printf("%d > gap_size*1.5 (%d)\n", cpt, gap_size);
+                    cpt = 0;
+                    step = 0;
+                } else {
+                    if(current == 255){
+                        cpt++;
+                    } else if (current == 0 && next == 0) {
+                        if (cpt < gap_size) {
+                            printf("STEP 2 : %d < gap_min\n", cpt);
+                            step = 0;
+                        } else {
+                            printf("STEP 2 : %d, %d\n",i, j );
+                            printf("STEP 2 cpt: %d\n",cpt);
+                            printf("STEP 2 gap_size: %d\n",gap_size);
+                            step++;
+                        }
+                        cpt = 0;
+                    }
+                }
+
+                break;
+                case 3:
+                if (cpt > gap_size * GAP_RATIO) {
+                    printf("STEP 3 : %d > gap_size$ (%d)\n", cpt, gap_size);
+                    cpt = 0;
+                    step = 0;
+                } else {
+                    if(current == 0){
+                        cpt++;
+                    } else if (current == 255 && next == 255) {
+                        if (cpt < gap_size) {
+                            step = 0;
+                        } else {
+                            end = j;
+                            printf("%d, %d\n",i, j );
+                            printf("######################################\n");
+                            printf("start : %d,%d, end : %d,%d\n", i,start, i,end);
+                            c.i = i;
+                            c.j = start + (end-start)/2;
+                            return c;
+                            printf("###str###################################\n");
+                            step = 0;
+                            exit(0);
+                        }
+                        cpt = 0;
+                    }
+                }
+
+                break;
+            }
+            // prev = current;
+        }
+    }
     return c;
 }
 
@@ -170,20 +260,20 @@ int px_is_possible(unsigned short *px, int i, int r, int len){
 struct coord mean_heap(struct coord *heap, int nb_elements){
 
     struct coord res;
-    res.x = 0;
-    res.y = 0;
+    res.i = 0;
+    res.j = 0;
 
     if(nb_elements == 0){
         return res;
     }
 
     for(int i = 0; i < nb_elements; i++){
-        res.x += heap[i].x;
-        res.y += heap[i].y;
+        res.i += heap[i].i;
+        res.j += heap[i].j;
     }
 
-    res.x /= nb_elements;
-    res.y /= nb_elements;
+    res.i /= nb_elements;
+    res.j /= nb_elements;
 
     return res;
 }
@@ -191,7 +281,7 @@ struct coord mean_heap(struct coord *heap, int nb_elements){
 int is_neighbour(struct coord *heap, int nb_elements, struct coord px){
     struct coord mean = mean_heap(heap, nb_elements);
 
-    return sqrt(pow(mean.x - px.x, 2) + pow(mean.y - px.y, 2)) < 2 * MAX_RADIUS;
+    return sqrt(pow(mean.i - px.i, 2) + pow(mean.j - px.j, 2)) < 2 * MAX_RADIUS;
 }
 
 void extract_circles(struct coord *possible_px, int nb_possibles, struct coord out[4]){
@@ -216,8 +306,8 @@ void extract_circles(struct coord *possible_px, int nb_possibles, struct coord o
             for(int j = 0; j < 4 && !sorted; j++){
                 if(nb_elements[j] == 0){
                     if(nb_elements[j] < MAX_POSSIBLES){
-                        heap[j][nb_elements[j]].x = possible_px[i].x;
-                        heap[j][nb_elements[j]].y = possible_px[i].y;
+                        heap[j][nb_elements[j]].i = possible_px[i].i;
+                        heap[j][nb_elements[j]].j = possible_px[i].j;
 
                         nb_elements[j]++;
                         sorted = 1;
@@ -254,8 +344,8 @@ void search_circles(pnm img, struct coord final_points[4]){
             for(int j = 0; j < rows; j++){
                 if(px_is_possible(buf, j, radius, rows)){
                     if(nb_possibles < MAX_POSSIBLES){
-                        possible_px[nb_possibles].x = i;
-                        possible_px[nb_possibles].y = j;
+                        possible_px[nb_possibles].i = i;
+                        possible_px[nb_possibles].j = j;
                         nb_possibles++;
                     }
                 }
@@ -266,12 +356,12 @@ void search_circles(pnm img, struct coord final_points[4]){
     extract_circles(possible_px, nb_possibles, final_points);
 
     for(int i = 0; i < 4; i++){
-        printf("Circle %d : (%d %d)\n", i, final_points[i].x, final_points[i].y);
+        printf("Circle %d : (%d %d)\n", i, final_points[i].i, final_points[i].j);
     }
 }
 
 float distance(struct coord p1, struct coord p2){
-    return(sqrt(pow(p1.x - p2.x, 2) + pow(p1.y - p2.y, 2)));
+    return(sqrt(pow(p1.i - p2.i, 2) + pow(p1.j - p2.j, 2)));
 }
 
 float compute_angle(struct coord centers[4]){
@@ -299,8 +389,8 @@ float compute_angle(struct coord centers[4]){
         }
     }
 
-    float a = fabs(centers[0].x - centers[index_target].x);
-    float b = fabs(centers[0].y - centers[index_target].y);
+    float a = fabs(centers[0].i - centers[index_target].i);
+    float b = fabs(centers[0].j - centers[index_target].j);
 
     if(b == 0)
         return 0;
