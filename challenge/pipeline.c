@@ -295,7 +295,7 @@ void extract_circles(struct coord *possible_px, int nb_possibles, struct coord o
         sorted = 0;
         for(int j = 0; j < MAX_HEAP && !sorted; j++){
             if(nb_elements[j] != 0){
-                if(is_neighbour(heap[j], nb_elements[j], possible_px[i])){
+                if(is_neighbour(heap[j], nb_elements[j], possible_px[i])){//if the pixel is part of the heap
                     if(nb_elements[j] < MAX_POSSIBLES){
                         heap[j][nb_elements[j]] = possible_px[i];
                         nb_elements[j]++;
@@ -305,7 +305,7 @@ void extract_circles(struct coord *possible_px, int nb_possibles, struct coord o
             }
         }
         if(!sorted){
-            for(int j = 0; j < MAX_HEAP && !sorted; j++){
+            for(int j = 0; j < MAX_HEAP && !sorted; j++){//Otherwise, we put the pixel in another heap
                 if(nb_elements[j] == 0){
                     if(nb_elements[j] < MAX_POSSIBLES){
                         heap[j][nb_elements[j]].i = possible_px[i].i;
@@ -333,7 +333,7 @@ void extract_circles(struct coord *possible_px, int nb_possibles, struct coord o
         }
     }
 
-    for(int i = 0; i < 4; i++){//Meaning heaps
+    for(int i = 0; i < 4; i++){//Meaning of heaps
         out[i] = mean_heap(heap[heap_order[i]], nb_elements[heap_order[i]]);
     }
 }
@@ -355,7 +355,7 @@ void search_circles(pnm img, struct coord final_points[4]){
     for(int radius = current_radius; radius < MAX_RADIUS + 1; radius++){
         for(int i = 0; i < cols; i++){
             for(int j = 0; j < rows; j++){
-                buf[j] = pnm_get_component(img, j, i, PnmRed);
+                buf[j] = pnm_get_component(img, j, i, PnmRed);//Create the buffer of an entire row.
             }
             for(int j = 0; j < rows; j++){
                 if(px_is_possible(buf, j, radius, rows)){
@@ -369,9 +369,11 @@ void search_circles(pnm img, struct coord final_points[4]){
         }
     }
 
-    printf("Found %d points\n", nb_possibles);
+    //TODO : make the same test px_is_possible on cols, then eliminate pixels that are not possible on both dimension (works fine without it)
 
-    extract_circles(possible_px, nb_possibles, final_points);//Create 4 points from possible_px (mean of each heap)
+    printf("Found %d possible points\n", nb_possibles);
+
+    extract_circles(possible_px, nb_possibles, final_points);//Create 4 points from all possible_px (mean of each heap)
 
     for(int i = 0; i < 4; i++){
         printf("Circle %d : (%d %d)\n", i, final_points[i].i, final_points[i].j);
@@ -383,8 +385,8 @@ float distance(struct coord p1, struct coord p2){
 }
 
 float compute_angle(struct coord centers[4]){
-    //float d_b = 0, d_c = 0, d_d = 0;
     int a = -1, b = -1, c = -1, d = -1;
+    //a, b, c and d are the points of the square to readjust, a is top left point, c is bottom right one
 
     for(int i = 0; i < 4; i++){
         if(a == -1 || centers[a].j > centers[i].j)
@@ -396,11 +398,11 @@ float compute_angle(struct coord centers[4]){
           b = i;
     }
 
-    /*if(centers[a].i > centers[b].j){
+    if(centers[a].i > centers[b].j){
         int tmp = a;
         a = b;
         b = tmp;
-    }*/
+    }
 
     for(int i = 0; i < 4; i++){
         if(c == -1 && i != a && i != b){
@@ -420,7 +422,7 @@ float compute_angle(struct coord centers[4]){
         d = tmp;
     }
 
-    float adx = centers[d].i - centers[a].i ;
+    float adx = centers[d].i - centers[a].i;
     float ady = centers[a].j - centers[d].j;
     float angle1 = 0;
 
@@ -434,7 +436,7 @@ float compute_angle(struct coord centers[4]){
     if(bcy != 0)
         angle2 = rad2deg(atanf(bcx/bcy));
 
-    return (angle1 + angle2) / 2;
+    return (angle1 + angle2) / 2;//compute both angles then return the mean (could return an error if angles are too different)
 }
 void process(char *ims_name, char *imd_name){
     pnm ims = pnm_load(ims_name);
@@ -454,7 +456,7 @@ void process(char *ims_name, char *imd_name){
     search_circles(imd, centers);
     float angle = compute_angle(centers);//degrees
     printf("angle %f\n", angle);
-    rotate(cols/2, rows/2, angle, ims, imd);
+    rotate(cols/2, rows/2, angle, ims, imd);//TODO : reshape imd so we don't lose any part of src img
     pnm_save(imd, PnmRawPpm, imd_name);
     pnm_free(ims);
     pnm_free(imd);
