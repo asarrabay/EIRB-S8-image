@@ -12,7 +12,8 @@
 #define TOLERANCE_DIFF_PIXELS_FILTER 60
 #define TOLERANCE_RATIO_CIRCLE_NOISE 0.90
 #define MAX_RADIUS 5
-#define MAX_POSSIBLES 512
+#define MAX_POSSIBLES 4192
+#define MAX_HEAP 8
 
 struct coord {
     int i;
@@ -285,13 +286,15 @@ int is_neighbour(struct coord *heap, int nb_elements, struct coord px){
 }
 
 void extract_circles(struct coord *possible_px, int nb_possibles, struct coord out[4]){
-    struct coord heap[4][MAX_POSSIBLES];
-    int nb_elements[4] = {0};
+    struct coord heap[MAX_HEAP][MAX_POSSIBLES];
+    int nb_elements[MAX_HEAP] = {0};
+    int heap_order[MAX_HEAP] = {0};
     int sorted = 0;
 
-    for(int i = 0; i < nb_possibles; i++){
+    for(int i = 0; i < nb_possibles; i++){//Creating heaps
+        printf("possible ; (%d %d)\n", possible_px[i].i, possible_px[i].j);
         sorted = 0;
-        for(int j = 0; j < 4 && !sorted; j++){
+        for(int j = 0; j < MAX_HEAP && !sorted; j++){
             if(nb_elements[j] != 0){
                 if(is_neighbour(heap[j], nb_elements[j], possible_px[i])){
                     if(nb_elements[j] < MAX_POSSIBLES){
@@ -303,7 +306,7 @@ void extract_circles(struct coord *possible_px, int nb_possibles, struct coord o
             }
         }
         if(!sorted){
-            for(int j = 0; j < 4 && !sorted; j++){
+            for(int j = 0; j < MAX_HEAP && !sorted; j++){
                 if(nb_elements[j] == 0){
                     if(nb_elements[j] < MAX_POSSIBLES){
                         heap[j][nb_elements[j]].i = possible_px[i].i;
@@ -317,8 +320,22 @@ void extract_circles(struct coord *possible_px, int nb_possibles, struct coord o
         }
     }
 
-    for(int i = 0; i < 4; i++){
-        out[i] = mean_heap(heap[i], nb_elements[i]);
+    for(int i = 0; i < MAX_HEAP; i++){
+        heap_order[i] = i;
+    }
+
+    for(int j = 0; j < MAX_HEAP; j++){
+        for(int i = j; i < MAX_HEAP; i++){
+            if(nb_elements[heap_order[j]] < nb_elements[heap_order[i]]){
+                int tmp = heap_order[j];
+                heap_order[j] = heap_order[i];
+                heap_order[i] = tmp;
+            }
+        }
+    }
+
+    for(int i = 0; i < 4; i++){//Meaning heaps
+        out[i] = mean_heap(heap[heap_order[i]], nb_elements[heap_order[i]]);
     }
 }
 
@@ -328,7 +345,7 @@ void search_circles(pnm img, struct coord final_points[4]){
     int current_radius = 5;
 
     unsigned short *buf = malloc(cols * rows * sizeof(short));
-    struct coord possible_px[MAX_POSSIBLES];
+    struct coord possible_px[MAX_POSSIBLES];//Finds the potential centers of 4 circles.
     int nb_possibles = 0;
 
     if(!buf){
@@ -353,7 +370,9 @@ void search_circles(pnm img, struct coord final_points[4]){
         }
     }
 
-    extract_circles(possible_px, nb_possibles, final_points);
+    printf("Found %d points\n", nb_possibles);
+
+    extract_circles(possible_px, nb_possibles, final_points);//Create 4 points from possible_px (mean of each heap)
 
     for(int i = 0; i < 4; i++){
         printf("Circle %d : (%d %d)\n", i, final_points[i].i, final_points[i].j);
@@ -365,39 +384,67 @@ float distance(struct coord p1, struct coord p2){
 }
 
 float compute_angle(struct coord centers[4]){
-    float max_dist = 0;
-    int index_max_dist = 0;
-    int index_target = 0;
+    float d_b = 0, d_c = 0, d_d = 0;
+    int a = 0, b = 0, c = 0, d = 0;
+    float current_dist_tmp = -1;
 
-    for(int i = 1; i < 4; i++){//finds diag
-        float tmp = distance(centers[i], centers[0]);
-        if(tmp > max_dist){
-            max_dist = tmp;
-            index_max_dist = i;
+    for(int i = 0; i < 4; i++){//finds a, the top left corner point
+        struct coord tmp;
+        tmp.i = 0;
+        tmp.j = 0;
+
+        float dist = distance(centers[i], tmp);
+        if(dist < current_dist_tmp || current_dist_tmp == -1){
+            current_dist_tmp = dist;
+            a = i;
         }
     }
 
-    max_dist = 0;
-
-    for(int i = 1; i < 4; i++){//finds longer side
-        if(i != index_max_dist){
-            float tmp = distance(centers[i], centers[0]);
-            if(tmp > max_dist){
-                max_dist = tmp;
-                index_target = i;
+    for(int i = 0; i < 4; i++){//finds c
+        if(i != a){
+            float tmp = distance(centers[i], centers[a]);
+            if(tmp > d_c){
+                d_c = tmp;
+                c = i;
             }
         }
     }
 
-    float a = fabs(centers[0].i - centers[index_target].i);
-    float b = centers[0].j - centers[index_target].j;
+    for(int i = 0; i < 4; i++){//finds d
+        if(i != a && i != c){
+            float tmp = distance(centers[i], centers[a]);
+            if(tmp > d_d){
+                d_d = tmp;
+                d = i;
+            }
+        }
+    }
 
-    if(b == 0)
-        return 0;
+    for(int i = 0; i < 4; i++){//finds b
+        if(i != a && i != c && i != d){
+            float tmp = distance(centers[i], centers[a]);
+            if(tmp > d_b){
+                d_b = tmp;
+                b = i;
+            }
+        }
+    }
 
-    float angle = rad2deg(atanf(a/b));
+    float adx = fabs(centers[a].i - centers[d].i);
+    float ady = centers[a].j - centers[d].j;
+    float angle1 = 0;
 
-    return angle;
+    float bcx = fabs(centers[b].i - centers[c].i);
+    float bcy = centers[b].j - centers[c].j;
+    float angle2 = 0;
+
+    if(ady != 0)
+        angle1 = rad2deg(atanf(adx/ady));
+
+    if(bcy != 0)
+        angle2 = rad2deg(atanf(bcx/bcy));
+
+    return (angle1 + angle2) / 2;
 }
 void process(char *ims_name, char *imd_name){
     pnm ims = pnm_load(ims_name);
@@ -405,12 +452,14 @@ void process(char *ims_name, char *imd_name){
     int rows = pnm_get_height(ims);
     // pnm imd = pnm_new(imd_name, cols, rows, PnmRawPpm);
     pnm imd;
-    imd = filter(ims);
+    imd = filter(ims);//Reduces noise
     // pnm_free(ims);
     // ims = imd;
     imd = thresholding(180, imd);
     //struct coord circle = find_circle(imd);
     //(void) circle;
+    // pnm_save(imd, PnmRawPpm, imd_name);
+    // return;
     struct coord centers[4];
     search_circles(imd, centers);
     float angle = compute_angle(centers);//degrees
