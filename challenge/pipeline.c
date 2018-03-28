@@ -292,7 +292,6 @@ void extract_circles(struct coord *possible_px, int nb_possibles, struct coord o
     int sorted = 0;
 
     for(int i = 0; i < nb_possibles; i++){//Creating heaps
-        printf("possible ; (%d %d)\n", possible_px[i].i, possible_px[i].j);
         sorted = 0;
         for(int j = 0; j < MAX_HEAP && !sorted; j++){
             if(nb_elements[j] != 0){
@@ -324,7 +323,7 @@ void extract_circles(struct coord *possible_px, int nb_possibles, struct coord o
         heap_order[i] = i;
     }
 
-    for(int j = 0; j < MAX_HEAP; j++){
+    for(int j = 0; j < MAX_HEAP; j++){//sort heaps to only consider the most detected ones
         for(int i = j; i < MAX_HEAP; i++){
             if(nb_elements[heap_order[j]] < nb_elements[heap_order[i]]){
                 int tmp = heap_order[j];
@@ -384,57 +383,48 @@ float distance(struct coord p1, struct coord p2){
 }
 
 float compute_angle(struct coord centers[4]){
-    float d_b = 0, d_c = 0, d_d = 0;
-    int a = 0, b = 0, c = 0, d = 0;
-    float current_dist_tmp = -1;
+    //float d_b = 0, d_c = 0, d_d = 0;
+    int a = -1, b = -1, c = -1, d = -1;
 
-    for(int i = 0; i < 4; i++){//finds a, the top left corner point
-        struct coord tmp;
-        tmp.i = 0;
-        tmp.j = 0;
+    for(int i = 0; i < 4; i++){
+        if(a == -1 || centers[a].j > centers[i].j)
+          a = i;
+    }
 
-        float dist = distance(centers[i], tmp);
-        if(dist < current_dist_tmp || current_dist_tmp == -1){
-            current_dist_tmp = dist;
-            a = i;
+    for(int i = 0; i < 4; i++){
+        if((b == -1 || centers[b].j > centers[i].j) && i != a)
+          b = i;
+    }
+
+    /*if(centers[a].i > centers[b].j){
+        int tmp = a;
+        a = b;
+        b = tmp;
+    }*/
+
+    for(int i = 0; i < 4; i++){
+        if(c == -1 && i != a && i != b){
+            c = i;
         }
     }
 
-    for(int i = 0; i < 4; i++){//finds c
-        if(i != a){
-            float tmp = distance(centers[i], centers[a]);
-            if(tmp > d_c){
-                d_c = tmp;
-                c = i;
-            }
+    for(int i = 0; i < 4; i++){
+        if(d == -1 && i != a && i != b && i != c){
+            d = i;
         }
     }
 
-    for(int i = 0; i < 4; i++){//finds d
-        if(i != a && i != c){
-            float tmp = distance(centers[i], centers[a]);
-            if(tmp > d_d){
-                d_d = tmp;
-                d = i;
-            }
-        }
+    if(centers[c].i < centers[d].j){
+        int tmp = c;
+        c = d;
+        d = tmp;
     }
 
-    for(int i = 0; i < 4; i++){//finds b
-        if(i != a && i != c && i != d){
-            float tmp = distance(centers[i], centers[a]);
-            if(tmp > d_b){
-                d_b = tmp;
-                b = i;
-            }
-        }
-    }
-
-    float adx = fabs(centers[a].i - centers[d].i);
+    float adx = centers[d].i - centers[a].i ;
     float ady = centers[a].j - centers[d].j;
     float angle1 = 0;
 
-    float bcx = fabs(centers[b].i - centers[c].i);
+    float bcx = centers[c].i - centers[b].i;
     float bcy = centers[b].j - centers[c].j;
     float angle2 = 0;
 
