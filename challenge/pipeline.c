@@ -8,10 +8,11 @@
 
 #define PI 3.14159265359
 #define GAP_RATIO 1.5
-#define SIZE_NEIGHBOURHOOD 7
+#define RATIO_NEIGHBOURHOOD 0.01
 #define TOLERANCE_DIFF_PIXELS_FILTER 60
 #define TOLERANCE_RATIO_CIRCLE_NOISE 0.90
-#define MAX_RADIUS 5
+#define CONFIDENCE_RATIO 0.00005
+#define MAX_RADIUS 30
 #define MAX_POSSIBLES 4192
 #define MAX_HEAP 8
 
@@ -145,11 +146,13 @@ pnm thresholding(unsigned short threshold, pnm ims){
 float get_mean_neighbourhood(pnm img, int i, int j){
     int cols = pnm_get_width(img);
     int rows = pnm_get_height(img);
+    int size_n_c = RATIO_NEIGHBOURHOOD * cols;
+    int size_n_r = RATIO_NEIGHBOURHOOD * rows;
 
     int nb_neighbours = 0;
     float sum = 0;
-    for(int x = i - SIZE_NEIGHBOURHOOD / 2; x < i + SIZE_NEIGHBOURHOOD / 2; x++){
-        for(int y = j - SIZE_NEIGHBOURHOOD / 2; y < j + SIZE_NEIGHBOURHOOD / 2; y++){
+    for(int x = i - size_n_c / 2; x < i + size_n_c / 2; x++){
+        for(int y = j - size_n_r / 2; y < j + size_n_r / 2; y++){
             if(x >= 0 && x < cols &&
                y >= 0 && y < rows){
                    unsigned short value = pnm_get_component(img, y, x, PnmRed);
@@ -343,22 +346,31 @@ void search_circles(pnm img, struct coord final_points[4]){
     int rows = pnm_get_height(img);
     int current_radius = 5;
 
-    unsigned short *buf = malloc(cols * rows * sizeof(short));
+    unsigned short *buf_rows = malloc(rows * sizeof(short));
+    unsigned short *buf_cols = malloc(cols * sizeof(short));
     struct coord possible_px[MAX_POSSIBLES];//Finds the potential centers of 4 circles.
     int nb_possibles = 0;
 
-    if(!buf){
+    if(!buf_rows || !buf_cols){
         fprintf(stderr, "Error malloc (%dx%d sized img)\n", cols, rows);
         exit(EXIT_FAILURE);
     }
 
-    for(int radius = current_radius; radius < MAX_RADIUS + 1; radius++){
+    for(int radius = current_radius; radius < MAX_RADIUS + 1 && (float)nb_possibles / (cols * rows) < CONFIDENCE_RATIO; radius++){
+        nb_possibles = 0;
+        printf("Testing radius %d\n", radius);
         for(int i = 0; i < cols; i++){
             for(int j = 0; j < rows; j++){
-                buf[j] = pnm_get_component(img, j, i, PnmRed);//Create the buffer of an entire row.
+                buf_rows[j] = pnm_get_component(img, j, i, PnmRed);//Create the buffer of an entire row.
             }
             for(int j = 0; j < rows; j++){
-                if(px_is_possible(buf, j, radius, rows)){
+                for(int c = 0; c < 8 * radius; c++){
+                    int index_cols = i + c - 4 * radius;
+                    if(index_cols >= 0 && index_cols < cols){
+                        buf_cols[c] = pnm_get_component(img, j, index_cols, PnmRed);
+                    }
+                }
+                if(px_is_possible(buf_rows, j, radius, rows) && px_is_possible(buf_cols, 4 * radius, radius, 8 * radius)){
                     if(nb_possibles < MAX_POSSIBLES){
                         possible_px[nb_possibles].i = i;
                         possible_px[nb_possibles].j = j;
@@ -368,8 +380,6 @@ void search_circles(pnm img, struct coord final_points[4]){
             }
         }
     }
-
-    //TODO : make the same test px_is_possible on cols, then eliminate pixels that are not possible on both dimension (works fine without it)
 
     printf("Found %d possible points\n", nb_possibles);
 
@@ -450,7 +460,7 @@ void process(char *ims_name, char *imd_name){
     imd = thresholding(180, imd);
     //struct coord circle = find_circle(imd);
     //(void) circle;
-    // pnm_save(imd, PnmRawPpm, imd_name);
+    //pnm_save(imd, PnmRawPpm, "out.ppm");
     // return;
     struct coord centers[4];
     search_circles(imd, centers);
