@@ -2,9 +2,6 @@
 #include <stdio.h>
 #include <pnm.h>
 #include <math.h>
-#include <domain.h>
-
-#include <fft.h>
 
 #define PI 3.14159265359
 #define GAP_RATIO 1.5
@@ -12,6 +9,7 @@
 #define TOLERANCE_DIFF_PIXELS_FILTER 60
 #define TOLERANCE_RATIO_CIRCLE_NOISE 0.90
 #define CONFIDENCE_RATIO 0.00005
+#define MIN_RADIUS 5
 #define MAX_RADIUS 30
 #define MAX_POSSIBLES 4192
 #define MAX_HEAP 8
@@ -22,102 +20,27 @@ struct coord {
 };
 void search_circles(pnm img, struct coord final_points[4]);
 
-struct coord find_circle(pnm img, int gap_min){
-    (void) img;
-    struct coord c;
-    int rows = pnm_get_height(img);
-    int cols = pnm_get_width(img);
-    for(int i = 0; i < rows; i++){
-        // unsigned short prev = pnm_get_component(img, i, 0, 0);
-        int step = 0;
-        int cpt = 0;
-        int gap_size = 0;
-        int start = 0;
-        int end = 0;
-        for (int j = 1; j < cols-1; j++) {
-            unsigned short current = pnm_get_component(img, i, j, 0);
-            unsigned short next = pnm_get_component(img, i, j+1, 0);
-            switch (step) {
-                case 0:
-                if (current == 0 && next == 0) {
-                    start = j;
-                    step++;
-                }
-                break;
-
-                case 1:
-                if(current == 0){
-                    cpt++;
-                } else if (current == 255 && next == 255) {
-                    if (cpt < gap_min) {
-                        // printf("%d < gap_min\n", cpt);
-                        step = 0;
-                    } else {
-                        // printf("STEP 1: %d, %d\n",i, j );
-                        step++;
-                        gap_size = cpt;
-                    }
-                    cpt = 0;
-                }
-
-                break;
-
-                case 2:
-                if (cpt > gap_size * GAP_RATIO) {
-                    // printf("%d > gap_size*1.5 (%d)\n", cpt, gap_size);
-                    cpt = 0;
-                    step = 0;
-                } else {
-                    if(current == 255){
-                        cpt++;
-                    } else if (current == 0 && next == 0) {
-                        if (cpt < gap_size) {
-                            printf("STEP 2 : %d < gap_min\n", cpt);
-                            step = 0;
-                        } else {
-                            printf("STEP 2 : %d, %d\n",i, j );
-                            printf("STEP 2 cpt: %d\n",cpt);
-                            printf("STEP 2 gap_size: %d\n",gap_size);
-                            step++;
-                        }
-                        cpt = 0;
-                    }
-                }
-
-                break;
-                case 3:
-                if (cpt > gap_size * GAP_RATIO) {
-                    printf("STEP 3 : %d > gap_size$ (%d)\n", cpt, gap_size);
-                    cpt = 0;
-                    step = 0;
-                } else {
-                    if(current == 0){
-                        cpt++;
-                    } else if (current == 255 && next == 255) {
-                        if (cpt < gap_size) {
-                            step = 0;
-                        } else {
-                            end = j;
-                            printf("%d, %d\n",i, j );
-                            printf("######################################\n");
-                            printf("start : %d,%d, end : %d,%d\n", i,start, i,end);
-                            c.i = i;
-                            c.j = start + (end-start)/2;
-                            return c;
-                            printf("###str###################################\n");
-                            step = 0;
-                            exit(0);
-                        }
-                        cpt = 0;
-                    }
-                }
-
-                break;
-            }
-            // prev = current;
-        }
+unsigned short bilinear_interpolation(float x, float y, pnm ims, int c) {
+    int rows = pnm_get_height(ims);
+    int cols = pnm_get_width(ims);
+    int i = floor(y);
+    int j = floor(x);
+    float dx = x - j;
+    float dy = y - i;
+    float interpolation = 0;
+    if (i >= 0 && j >= 0 && i < rows && j < cols) {
+        interpolation = interpolation + (1-dx) * (1-dy) * pnm_get_component(ims, i, j, c);
     }
-    return c;
+    if (i >= 0 && j+1 >= 0 && i < rows && j+1 < cols) {
+        interpolation = interpolation + dx * (1-dy) * pnm_get_component(ims, i, j+1, c);
+    }
+    if (i+1 >= 0 && j >= 0 && i+1 < rows && j < cols) {
+        interpolation = interpolation + (1-dx) * dy * pnm_get_component(ims, i+1, j, c);
+    }
+    if (i+1 >= 0 && j+1 >= 0 && i+1 < rows && j+1 < cols) {
+        interpolation = interpolation + dx * dy * pnm_get_component(ims, i+1, j+1, c);
+    }
+    return (unsigned short)interpolation;
 }
 
 float deg2rad(float deg) {
@@ -128,7 +51,7 @@ float rad2deg(float rad) {
     return rad * 180 / PI;
 }
 
-pnm thresholding(unsigned short threshold, pnm ims){
+pnm thresholding(unsigned short threshold, pnm ims){//set all pixels to white or black
     int rows = pnm_get_height(ims);
     int cols = pnm_get_width(ims);
     pnm imd = pnm_dup(ims);
@@ -174,7 +97,7 @@ int is_too_far(unsigned short px, unsigned short mean){
     return tmp > TOLERANCE_DIFF_PIXELS_FILTER;
 }
 
-pnm filter(pnm ims){
+pnm filter(pnm ims){//Reduces noise
     int cols = pnm_get_width(ims);
     int rows = pnm_get_height(ims);
 
@@ -344,7 +267,6 @@ void extract_circles(struct coord *possible_px, int nb_possibles, struct coord o
 void search_circles(pnm img, struct coord final_points[4]){
     int cols = pnm_get_width(img);
     int rows = pnm_get_height(img);
-    int current_radius = 5;
 
     unsigned short *buf_rows = malloc(rows * sizeof(short));
     unsigned short *buf_cols = malloc(cols * sizeof(short));
@@ -356,9 +278,9 @@ void search_circles(pnm img, struct coord final_points[4]){
         exit(EXIT_FAILURE);
     }
 
-    for(int radius = current_radius; radius < MAX_RADIUS + 1 && (float)nb_possibles / (cols * rows) < CONFIDENCE_RATIO; radius++){
+    for(int radius = MIN_RADIUS; radius < MAX_RADIUS + 1 && (float)nb_possibles / (cols * rows) < CONFIDENCE_RATIO; radius++){
         nb_possibles = 0;
-        printf("Testing radius %d\n", radius);
+        printf("Testing radius %d ...\n", radius);
         for(int i = 0; i < cols; i++){
             for(int j = 0; j < rows; j++){
                 buf_rows[j] = pnm_get_component(img, j, i, PnmRed);//Create the buffer of an entire row.
@@ -379,14 +301,17 @@ void search_circles(pnm img, struct coord final_points[4]){
                 }
             }
         }
+        if((float)nb_possibles / (cols * rows) < CONFIDENCE_RATIO){
+            printf("Failed\n");
+        }
     }
-
-    printf("Found %d possible points\n", nb_possibles);
 
     extract_circles(possible_px, nb_possibles, final_points);//Create 4 points from all possible_px (mean of each heap)
 
+    printf("Centers found :\n");
+
     for(int i = 0; i < 4; i++){
-        printf("Circle %d : (%d %d)\n", i, final_points[i].i, final_points[i].j);
+        printf("(%d %d)\n", final_points[i].i, final_points[i].j);
     }
 }
 
@@ -452,22 +377,20 @@ void process(char *ims_name, char *imd_name){
     pnm ims = pnm_load(ims_name);
     int cols = pnm_get_width(ims);
     int rows = pnm_get_height(ims);
-    // pnm imd = pnm_new(imd_name, cols, rows, PnmRawPpm);
     pnm imd;
+
+    printf("Processing on %s :\n", ims_name);
+
     imd = filter(ims);//Reduces noise
-    // pnm_free(ims);
-    // ims = imd;
     imd = thresholding(180, imd);
-    //struct coord circle = find_circle(imd);
-    //(void) circle;
-    //pnm_save(imd, PnmRawPpm, "out.ppm");
-    // return;
+
     struct coord centers[4];
     search_circles(imd, centers);
     float angle = compute_angle(centers);//degrees
-    printf("angle %f\n", angle);
-    rotate(cols/2, rows/2, angle, ims, imd);//TODO : reshape imd so we don't lose any part of src img
+    printf("Angle found : %f\n", angle);
+    rotate(cols/2, rows/2, angle, ims, imd);
     pnm_save(imd, PnmRawPpm, imd_name);
+    printf("Image saved on %s\n", imd_name);
     pnm_free(ims);
     pnm_free(imd);
 
